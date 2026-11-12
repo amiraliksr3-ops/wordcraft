@@ -119,6 +119,17 @@ fn saved_ui() -> Option<UiState> {
     UiState::from_json(&std::fs::read(path).ok()?)
 }
 
+/// The activity handle, kept for the whole process.
+///
+/// Dropping the last `AndroidApp` destroys android-activity's native state, and
+/// its `Drop` detaches the input queue from the framework's looper. A
+/// configuration change (a rotation, a window resize, the keyboard coming up)
+/// can land in the middle of that and aborts the process with
+/// "pthread_mutex_lock called on a destroyed mutex" from
+/// `InputQueue::detachLooper`. android-activity documents holding a handle in a
+/// `'static` as supported, so this keeps one.
+static ACTIVITY: std::sync::OnceLock<android_activity::AndroidApp> = std::sync::OnceLock::new();
+
 fn new_shell() -> Shell {
     let session = Session::new(wordcraft_doc::Document::new());
     let mut app = WordApp::new(session, services());
@@ -199,6 +210,7 @@ fn android_main(app: android_activity::AndroidApp) {
     let (loaded, skipped) = wordcraft_fonts::FontDb::global().load_user_fonts(&config.join("fonts"));
     log::info!("user fonts: {} loaded, {} skipped", loaded.len(), skipped.len());
     platform::init(&app, &files.join("media"));
+    let _ = ACTIVITY.set(app.clone());
 
     let mut options = eframe::NativeOptions::default();
     options.android_app = Some(app);

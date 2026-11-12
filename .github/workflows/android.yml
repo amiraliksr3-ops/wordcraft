@@ -129,6 +129,9 @@ jobs:
             # The default AVD is 320x640, which is not a phone anyone has.
             adb shell wm size 720x1280
             adb shell wm density 320
+            # Let the display configuration settle before the app starts, or the
+            # app is born into a pending configuration change.
+            sleep 20
             adb logcat -c
             adb shell am start -W -n ai.storyteller.wordcraft/.WordCraftActivity
             sleep 25
