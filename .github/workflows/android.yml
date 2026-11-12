@@ -13,7 +13,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android
+          targets: aarch64-linux-android,armv7-linux-androideabi
 
       - uses: Swatinem/rust-cache@v2
 
@@ -28,15 +28,31 @@ jobs:
       - name: Pick the newest NDK
         run: echo "ANDROID_NDK_HOME=$(ls -d "$ANDROID_SDK_ROOT"/ndk/* | sort -V | tail -1)" >> "$GITHUB_ENV"
 
-      - name: Install cargo-apk
-        run: cargo install cargo-apk --locked
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      # The activity, the Storage Access Framework bridge and the IME sink are
+      # Java, so the APK is assembled by Gradle around this library.
+      - name: Build the Rust library
+        run: |
+          set -euo pipefail
+          cargo ndk -t arm64-v8a -t armeabi-v7a \
+            -o apps/wordcraft-android/android/app/src/main/jniLibs \
+            build --release -p wordcraft-android
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
 
       - name: Build the APK
-        working-directory: apps/wordcraft-android
-        run: cargo apk build --target aarch64-linux-android
+        working-directory: apps/wordcraft-android/android
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Show the APK
+        run: ls -l apps/wordcraft-android/android/app/build/outputs/apk/debug/
 
       - uses: actions/upload-artifact@v4
         with:
           name: wordcraft-android-debug
-          path: target/debug/apk/wordcraft.apk
+          path: apps/wordcraft-android/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
