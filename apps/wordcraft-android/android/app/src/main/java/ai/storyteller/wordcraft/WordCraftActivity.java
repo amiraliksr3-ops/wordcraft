@@ -82,6 +82,14 @@ public class WordCraftActivity extends NativeActivity {
             getWindow().setDecorFitsSystemWindows(true);
         }
         installKeyboardSink();
+        // The sink is the window's served view from the start, so the only IME
+        // that ever opens is this app's (window-level IME requests fail with
+        // "view is not served" instead of opening a keyboard nothing types into).
+        imeSink.post(() -> {
+            if (imeSink.requestFocus()) {
+                Log.i(TAG, "keyboard sink focused");
+            }
+        });
     }
 
     // ---------------------------------------------------------------- pickers
@@ -459,10 +467,10 @@ public class WordCraftActivity extends NativeActivity {
                     imeSink.requestFocus();
                     imm.showSoftInput(imeSink, InputMethodManager.SHOW_FORCED);
                 } else {
+                    // Focus stays on the sink: handing it back to the decor view
+                    // is what let the window's IME open a keyboard with nothing
+                    // behind it.
                     imm.hideSoftInputFromWindow(imeSink.getWindowToken(), 0);
-                    imeSink.clearFocus();
-                    imeText = "";
-                    imeSink.setText("");
                 }
             } catch (Throwable e) {
                 Log.e(TAG, "keyboard failed", e);

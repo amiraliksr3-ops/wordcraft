@@ -136,7 +136,10 @@ fn new_shell() -> Shell {
     if let Some(ui) = saved_ui() {
         app.apply_prefs(ui);
     }
-    Shell { app, styled: false, keyboard: false, touched: false }
+    // `keyboard` starts true so the first frame hides the keyboard: the
+    // framework can restore one when the window is created, and nothing should
+    // cover the page until something is touched.
+    Shell { app, styled: false, keyboard: true, touched: false }
 }
 
 /// `AndroidLog`: `log` has no platform sink here, and a phone has no stderr a
