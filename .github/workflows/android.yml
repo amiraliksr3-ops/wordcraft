@@ -1,0 +1,39 @@
+name: Android APK
+
+on:
+  push:
+    branches: [android]
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+
+      # The runner image ships the NDK and build-tools; only the platform for
+      # `targetSdkVersion` may be missing.
+      - name: Android SDK packages
+        run: sdkmanager "platforms;android-35" > /dev/null
+
+      - name: Pick the newest NDK
+        run: echo "ANDROID_NDK_HOME=$(ls -d "$ANDROID_SDK_ROOT"/ndk/* | sort -V | tail -1)" >> "$GITHUB_ENV"
+
+      - name: Install cargo-apk
+        run: cargo install cargo-apk --locked
+
+      - name: Build the APK
+        working-directory: apps/wordcraft-android
+        run: cargo apk build --target aarch64-linux-android
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wordcraft-android-debug
+          path: target/debug/apk/wordcraft.apk
+          if-no-files-found: error

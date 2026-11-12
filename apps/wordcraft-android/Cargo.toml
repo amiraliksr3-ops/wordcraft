@@ -1,0 +1,39 @@
+[package]
+name = "wordcraft-android"
+description = "WordCraft on Android: the egui app with an Android activity shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+# The workspace forbids `unsafe`, but Android's entry point has to be an
+# `#[unsafe(no_mangle)]` symbol, so this crate does not inherit those lints.
+
+[lib]
+name = "wordcraft_android"
+crate-type = ["cdylib"]
+
+[dependencies]
+wordcraft-doc = { workspace = true }
+wordcraft-engine = { workspace = true }
+wordcraft-ui-egui = { workspace = true }
+egui = { workspace = true }
+log = { workspace = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+# `glow` paints through OpenGL ES, which every Android device has; wgpu would
+# need Vulkan and a much larger binary.
+eframe = { workspace = true, features = ["default_fonts", "glow", "android-native-activity"] }
+android-activity = { version = "0.6", features = ["native-activity"] }
+
+[package.metadata.android]
+package = "ai.storyteller.wordcraft"
+apk_name = "wordcraft"
+build_targets = ["aarch64-linux-android", "armv7-linux-androideabi"]
+
+[package.metadata.android.sdk]
+min_sdk_version = 26
+target_sdk_version = 35
+
+[package.metadata.android.application]
+label = "WordCraft"

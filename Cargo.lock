@@ -1455,6 +1455,7 @@ dependencies = [
  "egui-wgpu",
  "egui-winit",
  "egui_glow",
+ "glow",
  "glutin",
  "glutin-winit",
  "image",
@@ -6843,6 +6844,19 @@ dependencies = [
  "x11rb",
  "xkbcommon-dl",
  "zbus",
+]
+
+[[package]]
+name = "wordcraft-android"
+version = "0.18.1"
+dependencies = [
+ "android-activity",
+ "eframe",
+ "egui",
+ "log",
+ "wordcraft-doc",
+ "wordcraft-engine",
+ "wordcraft-ui-egui",
 ]
 
 [[package]]
