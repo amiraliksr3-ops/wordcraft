@@ -15,6 +15,7 @@ import android.provider.OpenableColumns;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -49,6 +50,8 @@ import java.util.List;
  * they chose.
  */
 public class WordCraftActivity extends NativeActivity {
+    private static final String TAG = "WordCraft";
+
     private static final int REQ_OPEN = 1001;
     private static final int REQ_SAVE = 1002;
     private static final int REQ_FONT = 1003;
@@ -421,6 +424,7 @@ public class WordCraftActivity extends NativeActivity {
         if (current.equals(imeText)) {
             return;
         }
+        Log.i(TAG, "typed " + current.length() + " chars");
         int shared = 0;
         while (shared < imeText.length() && shared < current.length()
                 && imeText.charAt(shared) == current.charAt(shared)) {
@@ -443,19 +447,25 @@ public class WordCraftActivity extends NativeActivity {
 
     /** Show or hide the soft keyboard (the app asks as text fields gain focus). */
     public void setKeyboardVisible(final boolean visible) {
+        Log.i(TAG, "keyboard " + (visible ? "show" : "hide"));
         runOnUiThread(() -> {
-            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (imm == null) {
-                return;
-            }
-            if (visible) {
-                imeSink.requestFocus();
-                imm.showSoftInput(imeSink, 0);
-            } else {
-                imm.hideSoftInputFromWindow(imeSink.getWindowToken(), 0);
-                imeSink.clearFocus();
-                imeText = "";
-                imeSink.setText("");
+            try {
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm == null) {
+                    return;
+                }
+                if (visible) {
+                    imeSink.setFocusableInTouchMode(true);
+                    imeSink.requestFocus();
+                    imm.showSoftInput(imeSink, InputMethodManager.SHOW_FORCED);
+                } else {
+                    imm.hideSoftInputFromWindow(imeSink.getWindowToken(), 0);
+                    imeSink.clearFocus();
+                    imeText = "";
+                    imeSink.setText("");
+                }
+            } catch (Throwable e) {
+                Log.e(TAG, "keyboard failed", e);
             }
         });
     }

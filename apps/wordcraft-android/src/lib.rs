@@ -40,9 +40,12 @@ impl eframe::App for Shell {
         // that arrived since the last frame.
         platform::pump(ctx);
         self.app.logic(ctx);
-        // The keyboard belongs up while an editable field has focus, and down
-        // otherwise: a phone has no room to leave it open behind a menu.
-        let wanted = ctx.egui_wants_keyboard_input();
+        // The keyboard belongs up while something has keyboard focus, and down
+        // otherwise: a phone has no room to leave it open behind a menu. The
+        // document is a custom canvas rather than a text field, so "wants a
+        // keyboard" alone never comes true there; a focused widget is the signal
+        // that covers both.
+        let wanted = ctx.egui_wants_keyboard_input() || ctx.memory(|memory| memory.focused().is_some());
         if wanted != self.keyboard {
             self.keyboard = wanted;
             platform::set_keyboard_visible(wanted);
@@ -59,7 +62,8 @@ impl eframe::App for Shell {
 /// the theme rather than replacing it, so the layout stays the Word-like one.
 fn touch_style(ctx: &Context) {
     ctx.all_styles_mut(|style| {
-        style.spacing.interact_size.y = 44.0;
+        // 48 dp is Android's touch minimum; the desktop's rows are about 20.
+        style.spacing.interact_size.y = 48.0;
         style.spacing.button_padding = egui::vec2(12.0, 8.0);
         style.spacing.item_spacing = egui::vec2(8.0, 6.0);
         style.spacing.menu_margin = egui::Margin::same(8);

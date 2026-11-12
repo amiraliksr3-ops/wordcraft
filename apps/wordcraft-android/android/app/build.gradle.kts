@@ -13,9 +13,13 @@ android {
         versionCode = 1
         versionName = "0.18.1"
         ndk {
-            // Same ABIs as before: everything still shipping, and no x86 emulator
-            // build to double the APK.
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            // Same ABIs as before: everything still shipping. `-Pabis=x86_64`
+            // builds the emulator test APK instead.
+            val abis = (project.findProperty("abis") as String?)
+                ?.split(",")
+                ?.filter { it.isNotBlank() }
+                ?: listOf("arm64-v8a", "armeabi-v7a")
+            abiFilters += abis
         }
     }
 
