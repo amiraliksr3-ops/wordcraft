@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Mutex, OnceLock};
-use std::time::UNIX_EPOCH;
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use egui::Context;
 use jni::JNIEnv;
@@ -51,6 +51,10 @@ static STAGED: Mutex<Vec<(PathBuf, (u64, u64))>> = Mutex::new(Vec::new());
 static TYPED: Mutex<Vec<Typed>> = Mutex::new(Vec::new());
 
 static NEXT_ID: AtomicI32 = AtomicI32::new(1);
+/// After a save destination is picked, keep asking for frames for a while: the
+/// frame that notices the written file is what copies it back, and an idle app
+/// would otherwise not draw again.
+static MIRROR_UNTIL: Mutex<Option<Instant>> = Mutex::new(None);
 
 /// One thing the keyboard produced.
 enum Typed {
@@ -254,6 +258,18 @@ pub fn pump(ctx: &Context) {
         });
     }
     mirror_writes();
+    keep_mirroring(ctx);
+}
+
+/// Keep drawing while a freshly picked save destination may be written, so the
+/// write is copied back promptly (battery is why it stops).
+fn keep_mirroring(ctx: &Context) {
+    let Ok(mut until) = MIRROR_UNTIL.lock() else { return };
+    match *until {
+        Some(at) if Instant::now() < at => ctx.request_repaint_after(Duration::from_millis(300)),
+        Some(_) => *until = None,
+        None => {}
+    }
 }
 
 fn key_event(key: egui::Key) -> egui::Event {
@@ -342,6 +358,9 @@ pub extern "system" fn Java_ai_storyteller_wordcraft_WordCraftActivity_nativePic
             }
         } else if let Some(path) = picked.first() {
             watch(path);
+            if let Ok(mut until) = MIRROR_UNTIL.lock() {
+                *until = Some(Instant::now() + Duration::from_secs(30));
+            }
         }
         let _ = answer.send(Ok(picked));
     }
