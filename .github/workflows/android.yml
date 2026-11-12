@@ -40,6 +40,13 @@ jobs:
             -o apps/wordcraft-android/android/app/src/main/jniLibs \
             build --release -p wordcraft-android
 
+      # The runner's default JDK is newer than Gradle's Groovy can read
+      # ("Unsupported class file major version 69"); Android's build tools want 17.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.13"
