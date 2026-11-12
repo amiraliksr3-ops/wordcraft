@@ -27,6 +27,10 @@ struct Shell {
     styled: bool,
     /// Whether the soft keyboard is up, so it is only shown or hidden on change.
     keyboard: bool,
+    /// Whether the page has been touched yet. Something holds keyboard focus
+    /// from the first frame, so without this the keyboard would cover half the
+    /// screen the moment the app opens.
+    touched: bool,
 }
 
 impl eframe::App for Shell {
@@ -40,12 +44,17 @@ impl eframe::App for Shell {
         // that arrived since the last frame.
         platform::pump(ctx);
         self.app.logic(ctx);
+        if ctx.input(|input| input.pointer.any_pressed()) {
+            self.touched = true;
+        }
         // The keyboard belongs up while something has keyboard focus, and down
         // otherwise: a phone has no room to leave it open behind a menu. The
         // document is a custom canvas rather than a text field, so "wants a
         // keyboard" alone never comes true there; a focused widget is the signal
-        // that covers both.
-        let wanted = ctx.egui_wants_keyboard_input() || ctx.memory(|memory| memory.focused().is_some());
+        // that covers both, and the touch gate keeps it down until the page is
+        // touched.
+        let focused = ctx.egui_wants_keyboard_input() || ctx.memory(|memory| memory.focused().is_some());
+        let wanted = self.touched && focused;
         if wanted != self.keyboard {
             self.keyboard = wanted;
             platform::set_keyboard_visible(wanted);
@@ -116,7 +125,7 @@ fn new_shell() -> Shell {
     if let Some(ui) = saved_ui() {
         app.apply_prefs(ui);
     }
-    Shell { app, styled: false, keyboard: false }
+    Shell { app, styled: false, keyboard: false, touched: false }
 }
 
 /// `AndroidLog`: `log` has no platform sink here, and a phone has no stderr a

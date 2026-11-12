@@ -126,19 +126,25 @@ jobs:
           script: |
             set -x
             adb install -r apps/wordcraft-android/android/app/build/outputs/apk/debug/app-debug.apk
-            adb shell wm size
+            # The default AVD is 320x640, which is not a phone anyone has.
+            adb shell wm size 720x1280
+            adb shell wm density 320
             adb logcat -c
             adb shell am start -W -n ai.storyteller.wordcraft/.WordCraftActivity
             sleep 25
             adb exec-out screencap -p > started.png
-            # Tap the page (the middle of the screen), where typing starts.
-            adb shell input tap 540 1100
+            # Tap the page, a little below the ribbon: that is where typing starts.
+            adb shell input tap 360 700
             sleep 6
             adb exec-out screencap -p > tapped.png
             adb shell dumpsys input_method | head -40
             adb shell input text "Hello"
-            sleep 8
+            sleep 6
             adb exec-out screencap -p > typed.png
+            adb shell input keyevent 67
+            sleep 4
+            adb exec-out screencap -p > deleted.png
+            adb shell dumpsys window 2>/dev/null | grep -E "mCurrentFocus|mServedView" | head -5
             adb logcat -d > logcat.txt
             adb shell pidof ai.storyteller.wordcraft || echo "PROCESS GONE"
 
@@ -151,6 +157,7 @@ jobs:
             started.png
             tapped.png
             typed.png
+            deleted.png
           if-no-files-found: warn
 
       - name: Show what happened
@@ -159,4 +166,9 @@ jobs:
           echo "=== crashes ==="
           grep -nE "FATAL EXCEPTION|AndroidRuntime|SIGSEGV|backtrace|panicked" logcat.txt | head -60 || true
           echo "=== wordcraft ==="
-          grep -nE "WordCraft|wordcraft|ai.storyteller" logcat.txt | tail -60 || true
+          grep -nE "WordCraft: |ai\.storyteller\.wordcraft.*died|PROCESS GONE" logcat.txt | tail -40 || true
+          # A crash is a failed run, not something to read past.
+          if grep -qE "FATAL EXCEPTION|Fatal signal|SIGSEGV" logcat.txt; then
+            echo "::error::the app crashed"
+            exit 1
+          fi
