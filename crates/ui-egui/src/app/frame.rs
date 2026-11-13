@@ -63,6 +63,21 @@ impl WordApp {
         }
     }
 
+    /// A phone-narrow window draws the compact title bar ([`chrome::phone_bar`]) and starts with
+    /// the ribbon folded so the page keeps its height. The host sets this from the window's size.
+    pub fn set_compact(&mut self, on: bool) {
+        if on && !self.compact {
+            self.ui.ribbon_collapsed = true;
+        }
+        self.compact = on;
+    }
+
+    /// Whether the page was tapped since the last call. A phone's keyboard stays down once the
+    /// user dismisses it, without the page losing focus, so the host raises it for a tap.
+    pub fn take_page_tap(&mut self) -> bool {
+        std::mem::take(&mut self.page_tapped)
+    }
+
     /// Draw the File page, the empty-window chrome, or the normal document window.
     pub(super) fn paint_window(&mut self, ui: &mut egui::Ui, ctx: &egui::Context, t: theme::Tokens) {
         let window = self.windows.shown();
@@ -71,7 +86,11 @@ impl WordApp {
             backstage::show(self, ui);
         } else if !self.has_document() {
             // No document open (#1129): the ribbon greyed out but for Help, and no page.
-            chrome::title_bar(self, ui);
+            if self.compact {
+                chrome::phone_bar(self, ui);
+            } else {
+                chrome::title_bar(self, ui);
+            }
             ribbon::show(self, ui);
             chrome::status_bar(self, ui);
             egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.canvas)).show(ui, |_| {});
@@ -82,7 +101,11 @@ impl WordApp {
             if screen != chrome::Screen::Normal {
                 chrome::screen_bar(self, ui, screen);
             } else {
-                chrome::title_bar(self, ui);
+                if self.compact {
+                    chrome::phone_bar(self, ui);
+                } else {
+                    chrome::title_bar(self, ui);
+                }
                 if moved(self) {
                     return;
                 }

@@ -36,6 +36,13 @@ static VM: OnceLock<JavaVM> = OnceLock::new();
 /// The running activity, as a global reference (the pointer `android-activity`
 /// hands over is borrowed and may be a local reference).
 static ACTIVITY: OnceLock<GlobalRef> = OnceLock::new();
+/// The system bars' edges in physical pixels, left, top, right, bottom, as the
+/// activity's window insets report them.
+static INSETS_PX: [AtomicI32; 4] = [const { AtomicI32::new(0) }; 4];
+/// Whether the keyboard is on screen, from the activity's window insets: the
+/// only truth about it, since a phone hides the keyboard without telling the
+/// app and without the page losing focus.
+static KEYBOARD_UP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// The egui context, so an answer that arrives between frames still repaints.
 static CONTEXT: OnceLock<Context> = OnceLock::new();
 /// Where picked files are staged.
@@ -326,6 +333,35 @@ fn mirror_writes() {
 ///
 /// # Safety
 /// Called by the JVM with a valid `paths` array; the references are borrowed.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_storyteller_wordcraft_WordCraftActivity_nativeInsets(
+    _env: JNIEnv<'_>,
+    _class: JObject<'_>,
+    left: jint,
+    top: jint,
+    right: jint,
+    bottom: jint,
+    keyboard: jboolean,
+) {
+    INSETS_PX[0].store(left, Ordering::Relaxed);
+    INSETS_PX[1].store(top, Ordering::Relaxed);
+    INSETS_PX[2].store(right, Ordering::Relaxed);
+    INSETS_PX[3].store(bottom, Ordering::Relaxed);
+    KEYBOARD_UP.store(keyboard != 0, Ordering::Relaxed);
+}
+
+/// The system bars' edges in egui points: left, top, right, bottom.
+pub fn insets(ctx: &Context) -> (f32, f32, f32, f32) {
+    let scale = ctx.pixels_per_point().max(0.5);
+    let read = |index: usize| INSETS_PX[index].load(Ordering::Relaxed).max(0) as f32 / scale;
+    (read(0), read(1), read(2), read(3))
+}
+
+/// Whether the keyboard is up, as the activity's window insets say.
+pub fn keyboard_shown() -> bool {
+    KEYBOARD_UP.load(Ordering::Relaxed)
+}
+
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_ai_storyteller_wordcraft_WordCraftActivity_nativePicked(
     mut env: JNIEnv<'_>,

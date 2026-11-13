@@ -147,6 +147,21 @@ jobs:
             adb shell input keyevent 67
             sleep 4
             adb exec-out screencap -p > deleted.png
+            # The other half of the report: the keyboard came up at launch, and once
+            # it was closed it never came back on a tap. Back closes it (the input
+            # method takes that key, not the app), then a tap on the page has to
+            # bring it back.
+            adb shell input keyevent 4
+            sleep 5
+            adb exec-out screencap -p > keyboard_closed.png
+            adb shell dumpsys input_method | grep -E "mInputShown|mServedView|isInputViewShown" | head -5
+            adb shell input tap 360 700
+            sleep 8
+            adb exec-out screencap -p > keyboard_back.png
+            adb shell input text " there"
+            sleep 6
+            adb exec-out screencap -p > retyped.png
+            adb shell dumpsys input_method | grep -E "mInputShown|mServedView|isInputViewShown" | head -5
             adb shell dumpsys window 2>/dev/null | grep -E "mCurrentFocus|mServedView" | head -5
             adb logcat -d > logcat.txt
             adb shell pidof ai.storyteller.wordcraft || echo "PROCESS GONE"
@@ -161,6 +176,9 @@ jobs:
             tapped.png
             typed.png
             deleted.png
+            keyboard_closed.png
+            keyboard_back.png
+            retyped.png
           if-no-files-found: warn
 
       - name: Show what happened
@@ -175,3 +193,6 @@ jobs:
             echo "::error::the app crashed"
             exit 1
           fi
+          # The keyboard has to open on a tap after the user closed it, and the
+          # last thing the app asked for is what the log shows.
+          grep -nE "WordCraft: keyboard" logcat.txt || echo "no keyboard lines"

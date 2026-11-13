@@ -171,6 +171,8 @@ impl WordApp {
             sent_full_screen,
             seen_full_screen,
             escape_free,
+            compact: false,
+            page_tapped: false,
             status_counts,
             missing_fonts,
             last_autosave,

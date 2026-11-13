@@ -161,6 +161,9 @@ impl WordApp {
         let WordApp {
             // App-wide.
             session: _,
+            // The window's form factor, and a page tap for the host: not per window.
+            compact: _,
+            page_tapped: _,
             services: _,
             printing: _,
             print_feedback_seen: _,

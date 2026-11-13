@@ -20,13 +20,20 @@ use wordcraft_ui_egui::{Services, UiState, WordApp};
 
 /// The desktop app wraps `WordApp` with window geometry, dialogs and
 /// printing; on a phone the wrapper owns the platform services instead.
+/// The width below which the window gets the phone's title bar, in points.
+const COMPACT_WIDTH: f32 = 600.0;
+
 struct Shell {
     app: WordApp,
     /// The touch-sized style is installed on the first frame, once the context
     /// exists.
     styled: bool,
-    /// Whether the soft keyboard is up, so it is only shown or hidden on change.
-    keyboard: bool,
+    /// Whether the keyboard was up last frame, to notice the user closing it.
+    keyboard_shown: bool,
+    /// The user closed the keyboard with its own button: Android hides it without
+    /// telling the app and without the page losing focus, so the next tap on the
+    /// page has to ask for it again. Nothing else brings it back by itself.
+    dismissed: bool,
     /// Whether the page has been touched yet. Something holds keyboard focus
     /// from the first frame, so without this the keyboard would cover half the
     /// screen the moment the app opens.
@@ -54,15 +61,49 @@ impl eframe::App for Shell {
         // that covers both, and the touch gate keeps it down until the page is
         // touched.
         let focused = ctx.egui_wants_keyboard_input() || ctx.memory(|memory| memory.focused().is_some());
-        let wanted = self.touched && focused;
-        if wanted != self.keyboard {
-            self.keyboard = wanted;
-            platform::set_keyboard_visible(wanted);
+        // A tap on the page raises the keyboard even when it was dismissed, and
+        // raising it is the whole reason a tap on a page of text does anything.
+        let tapped = self.app.take_page_tap();
+        let shown = platform::keyboard_shown();
+        if self.keyboard_shown && !shown && !tapped {
+            self.dismissed = true;
         }
+        if tapped {
+            self.dismissed = false;
+        }
+        self.keyboard_shown = shown;
+        let wanted = self.touched && !self.dismissed && (focused || tapped);
+        // Driven by what the keyboard actually does rather than by the last
+        // request: a keyboard the framework opens on its own is put away again
+        // while the page is untouched, and one the user closed stays closed.
+        if wanted && !shown {
+            platform::set_keyboard_visible(true);
+        } else if !wanted && shown {
+            platform::set_keyboard_visible(false);
+        }
+
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        self.app.ui(ui);
+        // The system bars are the window's, not the page's: pad the whole layout
+        // past them (the status bar's clock used to sit on the ribbon) and fill
+        // the strip behind them with the chrome's colour.
+        let (left, top, right, bottom) = platform::insets(ui.ctx());
+        let rect = ui.max_rect();
+        let inner = egui::Rect::from_min_max(
+            egui::pos2(rect.left() + left, rect.top() + top),
+            egui::pos2(rect.right() - right, rect.bottom() - bottom),
+        );
+        // A phone is a phone whatever the desktop's windows do: below this
+        // width the compact title bar replaces the desktop one.
+        self.app.set_compact(inner.width() < COMPACT_WIDTH);
+        if left + top + right + bottom > 0.5 && inner.width() > 1.0 && inner.height() > 1.0 {
+            ui.painter().rect_filled(rect, 0.0, ui.visuals().panel_fill);
+            let mut page = ui.new_child(egui::UiBuilder::new().max_rect(inner));
+            self.app.ui(&mut page);
+        } else {
+            self.app.ui(ui);
+        }
     }
 }
 
@@ -139,7 +180,7 @@ fn new_shell() -> Shell {
     // `keyboard` starts true so the first frame hides the keyboard: the
     // framework can restore one when the window is created, and nothing should
     // cover the page until something is touched.
-    Shell { app, styled: false, keyboard: true, touched: false }
+    Shell { app, styled: false, keyboard_shown: false, dismissed: false, touched: false }
 }
 
 /// `AndroidLog`: `log` has no platform sink here, and a phone has no stderr a

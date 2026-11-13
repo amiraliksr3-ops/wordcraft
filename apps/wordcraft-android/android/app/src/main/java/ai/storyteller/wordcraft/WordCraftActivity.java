@@ -82,6 +82,7 @@ public class WordCraftActivity extends NativeActivity {
             getWindow().setDecorFitsSystemWindows(true);
         }
         installKeyboardSink();
+        watchInsets();
         // The sink is the window's served view from the start, so the only IME
         // that ever opens is this app's (window-level IME requests fail with
         // "view is not served" instead of opening a keyboard nothing types into).
@@ -494,7 +495,43 @@ public class WordCraftActivity extends NativeActivity {
 
     // ----------------------------------------------------------------- natives
 
+    /**
+     * Report the system bars' and the keyboard's edges to the shell, which insets the page past
+     * them. The theme asks for a window that fits the system bars, but Android 15 draws every app
+     * edge to edge whatever it asks, so the layout pads itself instead of trusting the window.
+     */
+    private void watchInsets() {
+        final android.view.View decor = getWindow().getDecorView();
+        decor.setOnApplyWindowInsetsListener((view, insets) -> {
+            int left;
+            int top;
+            int right;
+            int bottom;
+            boolean keyboard = false;
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets bars = insets.getInsets(
+                    android.view.WindowInsets.Type.systemBars()
+                        | android.view.WindowInsets.Type.displayCutout());
+                left = bars.left;
+                top = bars.top;
+                right = bars.right;
+                bottom = bars.bottom;
+                keyboard = insets.isVisible(android.view.WindowInsets.Type.ime());
+            } else {
+                left = insets.getSystemWindowInsetLeft();
+                top = insets.getSystemWindowInsetTop();
+                right = insets.getSystemWindowInsetRight();
+                bottom = insets.getSystemWindowInsetBottom();
+            }
+            nativeInsets(left, top, right, bottom, keyboard);
+            return insets;
+        });
+        decor.requestApplyInsets();
+    }
+
     private native void nativePicked(int id, String[] paths);
+
+    private native void nativeInsets(int left, int top, int right, int bottom, boolean keyboard);
 
     private native void nativeImeText(String text);
 

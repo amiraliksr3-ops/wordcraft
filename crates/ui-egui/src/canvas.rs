@@ -889,6 +889,9 @@ fn update_canvas_focus(app: &mut WordApp, ui: &mut Ui, resp: &egui::Response, im
     let focus_click = pointer_click || accesskit_click || resp.drag_started();
     if focus_click {
         ui.memory_mut(|memory| memory.interrupt_ime());
+        // A tap on the page brings the soft keyboard back after the user dismissed it (a phone
+        // hides the keyboard without the page losing focus).
+        app.page_tapped = true;
     }
     // Not while a modal dialog is open: it has the keyboard, and the page takes it when it closes.
     let wants = app.canvas.want_focus && !app.modal_open();

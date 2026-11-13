@@ -737,6 +737,11 @@ pub struct WordApp {
     /// Nothing else (a dialog, menu, keytips, the File tab) is open to take Escape this frame, so
     /// Escape may leave full screen. Read before anything handles the frame's keys.
     escape_free: bool,
+    /// The window is phone-narrow: the compact title bar replaces the desktop one, and the ribbon
+    /// starts folded so the page keeps its height.
+    compact: bool,
+    /// The page was tapped this frame ([`WordApp::take_page_tap`]).
+    page_tapped: bool,
     pub quit_requested: bool,
     pub autosave: bool,
     /// The document's fonts that aren't installed, for the status bar and the font box, and the

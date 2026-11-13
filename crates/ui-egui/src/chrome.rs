@@ -299,6 +299,49 @@ pub(crate) fn title_drag_rect(ctx: &egui::Context) -> Option<Rect> {
     ctx.data(|d| d.get_temp::<(Rect, u64)>(key)).filter(|(_, p)| *p == pass).map(|(r, _)| r)
 }
 
+/// The title bar a phone gets in place of [`title_bar`]: the document's name between the controls
+/// a thumb needs, with the ribbon's tab strip below it. The desktop bar's search, community and
+/// account controls have no room here, and a long name runs under the buttons rather than pushing
+/// them about.
+pub fn phone_bar(app: &mut WordApp, ui: &mut Ui) {
+    let t = Tokens::get(ui.ctx());
+    egui::Panel::top("phone_bar")
+        .exact_size(46.0)
+        .frame(egui::Frame::NONE.fill(t.title_bar))
+        .show(ui, |ui| {
+            let full = ui.max_rect();
+            let dirty = if app.session.dirty { " •" } else { "" };
+            let name = format!("{}{dirty}", app.title_stem());
+            let galley = ui.painter().layout(name, medium(13.5), t.text, (full.width() - 150.0).max(0.0));
+            let pos = pos2(full.center().x - galley.size().x / 2.0, full.center().y - galley.size().y / 2.0);
+            ui.painter().galley(pos, galley, t.text);
+            let font = regular(12.0);
+            crate::rtl::root(ui, |ui| {
+                ui.horizontal_centered(|ui| {
+                    ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
+                    ui.add_space(6.0);
+                    if crate::widgets::icon_only_button(ui, "undo", &tl!("Undo"), font.clone(), false).clicked() {
+                        let _ = app.run("edit.undo", json!({}));
+                    }
+                    if crate::widgets::icon_only_button(ui, "redo", &tl!("Redo"), font.clone(), false).clicked() {
+                        let _ = app.run("edit.redo", json!({}));
+                    }
+                    // The ribbon keeps its tab strip and folds its body away on a phone, so the
+                    // page gets the height; this brings the body back.
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.add_space(6.0);
+                        let folded = app.ui.ribbon_collapsed;
+                        let icon = if folded { "chevronDown" } else { "chevronUp" };
+                        let label = if folded { tl!("Show the ribbon") } else { tl!("Hide the ribbon") };
+                        if crate::widgets::icon_only_button(ui, icon, &label, font, false).clicked() {
+                            app.ui.ribbon_collapsed = !folded;
+                        }
+                    });
+                });
+            });
+        });
+}
+
 /// Draws the title bar with window dragging, AutoSave, quick access, account, community and search
 /// controls, and the centred clickable document title.
 pub fn title_bar(app: &mut WordApp, ui: &mut Ui) {
