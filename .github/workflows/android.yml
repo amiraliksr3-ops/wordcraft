@@ -40,9 +40,25 @@ jobs:
           CARGO_PROFILE_RELEASE_STRIP: symbols
         run: |
           set -euo pipefail
+          # A library left over from an earlier run is packaged as it is, and then the
+          # activity calls a native that the stale copy doesn't have.
+          rm -rf apps/wordcraft-android/android/app/src/main/jniLibs
           cargo ndk -t arm64-v8a -t armeabi-v7a \
             -o apps/wordcraft-android/android/app/src/main/jniLibs \
             build --release -p wordcraft-android
+
+      # The activity's native methods live in this library by their exact JNI
+      # names: check the ones it calls before Gradle wraps them into an APK that
+      # would throw UnsatisfiedLinkError on a device.
+      - name: Check the library exports the activity's natives
+        run: |
+          set -euo pipefail
+          nm="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          lib=apps/wordcraft-android/android/app/src/main/jniLibs/arm64-v8a/libwordcraft_android.so
+          for native in nativeBack nativeImeKey nativeImeText nativeInsets nativePicked; do
+            "$nm" -D --defined-only "$lib" | grep -q "Java_ai_storyteller_wordcraft_WordCraftActivity_$native" \
+              || { echo "::error::$native is missing from $lib"; exit 1; }
+          done
 
       # The runner's default JDK is newer than Gradle's Groovy can read
       # ("Unsupported class file major version 69"); Android's build tools want 17.
@@ -92,9 +108,20 @@ jobs:
           CARGO_PROFILE_DEV_STRIP: symbols
         run: |
           set -euo pipefail
+          rm -rf apps/wordcraft-android/android/app/src/main/jniLibs
           cargo ndk -t x86_64 \
             -o apps/wordcraft-android/android/app/src/main/jniLibs \
             build -p wordcraft-android
+
+      - name: Check the library exports the activity's natives
+        run: |
+          set -euo pipefail
+          nm="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          lib=apps/wordcraft-android/android/app/src/main/jniLibs/x86_64/libwordcraft_android.so
+          for native in nativeBack nativeImeKey nativeImeText nativeInsets nativePicked; do
+            "$nm" -D --defined-only "$lib" | grep -q "Java_ai_storyteller_wordcraft_WordCraftActivity_$native" \
+              || { echo "::error::$native is missing from $lib"; exit 1; }
+          done
 
       - uses: actions/setup-java@v4
         with:
